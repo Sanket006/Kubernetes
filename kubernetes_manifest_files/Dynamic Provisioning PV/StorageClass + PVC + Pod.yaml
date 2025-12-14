@@ -1,0 +1,48 @@
+# --------------------------
+# StorageClass
+# --------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sc-fast
+provisioner: ebs.csi.aws.com   # For local-path provisioner use a real one aws-ebs ex: provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer     # Recommended for scheduling + binding
+reclaimPolicy: Delete
+
+---
+
+# --------------------------
+# PVC (auto-creates PV dynamically)
+# --------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-fast
+spec:
+  storageClassName: sc-fast
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+
+# --------------------------
+# Pod using PVC
+# --------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-using-dynamic-pv
+spec:
+  containers:
+  - name: app
+    image: nginx
+    volumeMounts:
+    - name: data-storage
+      mountPath: /usr/share/nginx/html
+  volumes:
+  - name: data-storage
+    persistentVolumeClaim:
+      claimName: pvc-fast

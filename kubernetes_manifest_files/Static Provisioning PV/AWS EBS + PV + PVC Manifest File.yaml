@@ -1,0 +1,61 @@
+# ------------------------------
+# PersistentVolume (PV) - EBS
+# ------------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ebs-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  awsElasticBlockStore:
+    volumeID: vol-0abcd1234ef567890     # <-- Replace with your EBS Volume ID
+    fsType: ext4
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+          - ap-south-1a                 # <-- Replace with your AZ
+
+---
+# ------------------------------
+# PersistentVolumeClaim (PVC)
+# ------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ebs-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: ""
+
+---
+# ------------------------------------
+# Pod (Using PVC)
+# ------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app-using-ebs
+spec:
+  containers:
+  - name: app
+    image: nginx
+    volumeMounts:
+    - name: ebs-storage
+      mountPath: /data
+  volumes:
+  - name: ebs-storage
+    persistentVolumeClaim:
+      claimName: ebs-pvc

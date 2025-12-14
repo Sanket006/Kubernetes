@@ -1,0 +1,71 @@
+# --------------------------
+# PersistentVolume (PV)
+# --------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-local-ssd
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  local:
+    path: /mnt/data       # This path must exist on the node
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: disk
+          operator: In
+          values:
+          - ssd
+
+---
+
+# --------------------------
+# PersistentVolumeClaim (PVC)
+# --------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-local-ssd
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+# --------------------------
+# Pod using PVC + Node Affinity
+# --------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-using-ssd
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: disk
+            operator: In
+            values:
+            - ssd
+  containers:
+  - name: app
+    image: nginx
+    volumeMounts:
+    - name: data-storage
+      mountPath: /usr/share/nginx/html
+  volumes:
+  - name: data-storage
+    persistentVolumeClaim:
+      claimName: pvc-local-ssd

@@ -1,0 +1,50 @@
+# ------------------------------------
+# StorageClass (Dynamic Provisioning)
+# ------------------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sc-dynamic
+provisioner: kubernetes.io/aws-ebs   # Change based on your cluster
+parameters:
+  type: gp2                          # For AWS EBS
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+
+---
+
+# ------------------------------------
+# PersistentVolumeClaim (PVC)
+# ------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-dynamic
+spec:
+  storageClassName: sc-dynamic
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+
+# ------------------------------------
+# Pod (Using PVC)
+# ------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-using-dynamic-pvc
+spec:
+  containers:
+  - name: app
+    image: nginx
+    volumeMounts:
+    - name: app-storage
+      mountPath: /usr/share/nginx/html
+  volumes:
+  - name: app-storage
+    persistentVolumeClaim:
+      claimName: pvc-dynamic

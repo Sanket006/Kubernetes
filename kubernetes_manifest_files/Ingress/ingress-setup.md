@@ -1,4 +1,6 @@
-Using YAML (Direct Download from Kubernetes) :
+# How to Setup Ingress in Kubernetes Cluster
+
+### Using YAML (Direct Download from Kubernetes) :
 
 ```bash
  kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml

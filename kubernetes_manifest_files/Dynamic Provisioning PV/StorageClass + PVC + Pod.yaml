@@ -37,11 +37,11 @@ metadata:
   name: pod-using-dynamic-pv
 spec:
   containers:
-  - name: app
-    image: nginx
-    volumeMounts:
-    - name: data-storage
-      mountPath: /usr/share/nginx/html
+    - name: app
+      image: nginx
+      volumeMounts:
+        - name: data-storage
+        mountPath: /usr/share/nginx/html
   volumes:
   - name: data-storage
     persistentVolumeClaim:

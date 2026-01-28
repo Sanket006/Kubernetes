@@ -207,7 +207,7 @@ Contributions are welcome!
 
 ## 📄 License
 
-No license file is currently present. Consider adding **MIT** or **Apache 2.0** for open-source usage clarity.
+This project is open source under the **MIT License**.
 
 ---
 

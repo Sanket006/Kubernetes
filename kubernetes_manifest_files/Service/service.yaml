@@ -4,6 +4,6 @@ metadata:
   name: my-svc
 spec:
   ports:
-    protocpol: TCP
+    protocol: TCP
     port: 80
     targetPort: 80  

@@ -1,8 +1,8 @@
-# Kubernetes ConfigMap Manifests
+# ☸️ Kubernetes ConfigMap Manifests
 
-This folder contains **Kubernetes ConfigMap manifest files**. A **ConfigMap** is a Kubernetes object that stores **configuration data in key-value pairs**, which can be consumed by Pods as environment variables, command-line arguments, or configuration files.
+This folder contains **Kubernetes ConfigMap manifest examples**. A **ConfigMap** is an API object used to store non-confidential data in key-value pairs. 
 
-ConfigMaps decouple **configuration from container images**, enabling dynamic configuration changes without rebuilding images.
+ConfigMaps allow you to decouple environment-specific configuration (such as database URLs, ports, log levels, and properties) from container images, making your applications easily portable across environments without rebuilding container images.
 
 ---
 
@@ -11,174 +11,98 @@ ConfigMaps decouple **configuration from container images**, enabling dynamic co
 ```
 kubernetes_manifest_files/
 └── ConfigMap/
-    ├── app-configmap.yaml  
-    ├── configmap-deployment.yaml
-    ├── configmap-pod-specific-env.yaml
-    ├── configmap-pod.yaml
-    └── README.md
+    ├── app-configmap.yaml               # Standard ConfigMap definition
+    ├── configmap-pod.yaml               # Injecting ConfigMap as env vars and mounting as a file volume
+    ├── configmap-pod-specific-env.yaml  # Injecting specific keys from ConfigMap
+    ├── configmap-deployment.yaml        # Consuming ConfigMap inside a Deployment
+    └── README.md                        # This documentation file
 ```
-
-This folder includes YAML files defining ConfigMap resources.
-
----
-
-## 📘 What is a Kubernetes ConfigMap?
-
-A **ConfigMap** stores configuration data for applications. Key points:
-
-* Stores non-confidential configuration data
-* Can be consumed as environment variables, volume-mounted files, or command arguments
-* Supports multiple data sources in a single object
-
-In simple terms:
-
-> **ConfigMap lets you provide configuration to your Pods without baking it into the container image.**
-
----
-
-## 🎓 What You Learn from ConfigMaps
-
-By working with ConfigMap manifests, you will understand:
-
-* How to separate configuration from code
-* Consuming configuration as environment variables or files
-* Updating ConfigMaps without redeploying containers
-* Integration with Deployments, Pods, and StatefulSets
 
 ---
 
 ## 🧩 Core Fields Used in ConfigMap YAML
 
-A typical ConfigMap manifest includes:
-
 * **apiVersion**: `v1`
 * **kind**: `ConfigMap`
-* **metadata**:
+* **metadata**: Name, namespace, and labels.
+* **data**: Key-value pairs of configuration data (strings).
+* **binaryData**: Optional base64-encoded binary data.
 
-  * `name`: ConfigMap name
-  * `namespace`: Namespace (optional)
-* **data**: Key-value pairs containing configuration data
-* **binaryData**: Optional base64-encoded binary data
+---
 
-**Example YAML:**
+## 📘 Practical Examples
 
+### 1. ConfigMap Manifest (`app-configmap.yaml`)
 ```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: app-config
 data:
-  LOG_LEVEL: DEBUG
-  APP_PORT: "8080"
+  APP_ENV: "development"
+  APP_DEBUG: "true"
+  DATABASE_URL: "jdbc:mysql://mysql-svc:3306/testdb"
+  WELCOME_MESSAGE: "Welcome to Developer Environment!"
 ```
 
-Consume in Pod as environment variables:
-
+### 2. Injecting Specific Keys in Pod Env (`configmap-pod-specific-env.yaml`)
 ```yaml
 apiVersion: v1
 kind: Pod
 metadata:
-  name: app-pod
+  name: configmap-pod-specific-env
 spec:
   containers:
-  - name: app-container
-    image: myapp:1.0
-    envFrom:
-    - configMapRef:
-        name: app-config
+    - name: app-container
+      image: nginx:1.25.3-alpine
+      env:
+        - name: DEBUG_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config               # Name of ConfigMap
+              key: APP_DEBUG                 # Key to extract
 ```
 
 ---
 
-## ▶️ kubectl Commands (Apply, Verify & Describe)
+## ▶️ kubectl Operations
 
-Apply ConfigMap manifests:
-
+### Apply the Manifests
 ```bash
 kubectl apply -f kubernetes_manifest_files/ConfigMap/
 ```
 
-Verify ConfigMaps:
-
+### Verify & Describe
 ```bash
-kubectl get configmap
+# List all ConfigMaps
+kubectl get configmaps
+
+# View key-value data inside a ConfigMap
+kubectl describe configmap app-config
 ```
 
-Describe a ConfigMap:
-
+### Delete ConfigMap
 ```bash
-kubectl describe configmap <configmap-name>
-```
-
-Delete a ConfigMap:
-
-```bash
-kubectl delete configmap <configmap-name>
+kubectl delete -f kubernetes_manifest_files/ConfigMap/
 ```
 
 ---
 
-## 🔍 ConfigMap Working Flow
+## 🔑 Injection Methods Comparison
 
-1. Create ConfigMap with key-value data
-2. Pods reference ConfigMap via environment variables, volume mounts, or command arguments
-3. Changes to ConfigMap can be propagated to Pods (depending on consumption method)
-
-```
-ConfigMap → Pod (Env vars / Volume / Args) → Application
-```
+1. **`envFrom`**: Injects all key-value pairs in the ConfigMap as environment variables directly inside the container.
+2. **`valueFrom.configMapKeyRef`**: Selects specific keys from the ConfigMap to inject as environment variables.
+3. **Volume Mount**: Mounts the ConfigMap as a directory inside the container, where each key becomes a filename and the value is the file's content. Mounted volumes auto-update in real-time when the ConfigMap is modified.
 
 ---
 
-## 🧪 Common Use Cases
+## 🛡️ Best Practices & Common Mistakes
 
-* Application configuration (ports, log levels, feature flags)
-* Environment-specific settings (dev/test/prod)
-* Passing configuration files to containers
-* Centralized configuration management
+* **Never Store Sensitive Data:** ConfigMaps are not encrypted. For passwords, API keys, and certificates, use **Secrets**.
+* **Volume Mount Auto-Updates:** Files mounted via ConfigMap volumes update automatically within a few minutes after the ConfigMap is edited. However, environment variables injected via `envFrom` or `configMapKeyRef` will **not** update until the Pod is restarted.
 
 ---
 
-## ⚠️ Common Mistakes
+## 🛣️ Learning Path Navigation
 
-* Mounting ConfigMap keys that don’t exist
-* Not handling updates for running Pods properly
-* Storing sensitive data in ConfigMaps (use Secret instead)
-* Naming conflicts across namespaces
-
----
-
-## ✅ Best Practices
-
-* Use ConfigMap for non-sensitive configuration only
-* Keep key names consistent and meaningful
-* Combine with Secrets for sensitive data
-* Monitor usage and update strategy for running Pods
-* Use versioning or naming conventions for updates
-
----
-
-## 🛣️ Learning Path Linkage
-
-### Before ConfigMap
-
-➡️ **Pod → Deployment → Service → Ingress → Namespace**
-Understand workload deployment and namespace isolation
-
-### After ConfigMap
-
-➡️ **Secret → DaemonSet → StatefulSet → HPA**
-Learn secure configuration, cluster-wide services, and autoscaling
-
----
-
-## 📬 Support & Contributions
-
-For questions, issues, or improvements:
-
-* Open a GitHub issue
-* Submit a Pull Request
-
----
-
-Happy Kubernetes Configuration Management with ConfigMaps! 🚀
+    ⏮️ **[Namespace](../Namespace/README.md)** | ⏭️ **[Secret](../Secret/README.md)**

@@ -1,12 +1,8 @@
-# Kubernetes PersistentVolume (PV) and PersistentVolumeClaim (PVC) Manifests
+# ☸️ Kubernetes PersistentVolume (PV) & PVC Manifests
 
-This folder contains **Kubernetes PersistentVolume (PV) and PersistentVolumeClaim (PVC) manifest files**.
+This folder contains **Kubernetes PersistentVolume (PV) and PersistentVolumeClaim (PVC) manifest examples**. 
 
-A **PersistentVolume (PV)** is a piece of storage in the cluster that has been provisioned by an administrator or dynamically created using a StorageClass.
-
-A **PersistentVolumeClaim (PVC)** is a request for storage by a user that binds to a matching PV to provide persistent storage for Pods.
-
-PV and PVC provide **persistent storage independent of Pod lifecycle**, allowing stateful applications to store data reliably.
+In Kubernetes, container filesystems are ephemeral. If a container crashes or is rescheduled, all files generated during its execution are lost. PV and PVC resources decouple storage implementation details from application specifications, allowing stateful workloads to persist data beyond the lifecycle of individual Pods.
 
 ---
 
@@ -15,210 +11,107 @@ PV and PVC provide **persistent storage independent of Pod lifecycle**, allowing
 ```
 kubernetes_manifest_files/
 └── PersistentVolume/
-    ├── pv-pvc-deployment.yaml 
-    ├── pv-pvc-using-node-affinity.yaml
-    ├── pv-pvc-pod.yaml
-    ├── pv-pvc.yaml
-    ├── pv.yaml
-    ├── pvc.yaml
-    └── README.md 
+    ├── pv.yaml                             # Static HostPath PV definition
+    ├── pvc.yaml                            # PVC matching static PV parameters
+    ├── pv-pvc.yaml                         # Combined PV and PVC manifest
+    ├── pv-pvc-pod.yaml                     # Pod mounting static HostPath PVC
+    ├── pv-pvc-deployment.yaml              # Deployment binding to HostPath PVC
+    ├── pv-pvc-pod-using-node-affinity.yaml # Local PV with node selector rules
+    └── README.md                           # This documentation file
 ```
 
-This folder includes YAML files defining PV and PVC resources.
-
 ---
 
-## 📘 What are PersistentVolume and PersistentVolumeClaim?
+## 🧩 Core Fields Used in PV & PVC YAML
 
-**PersistentVolume (PV)**:
-
-* Represents a storage resource in the cluster
-* Exists independently of Pod lifecycle
-* Can be **statically** or **dynamically provisioned**
-
-**PersistentVolumeClaim (PVC)**:
-
-* Requests storage from the cluster
-* Specifies access mode and storage size
-* Binds to a suitable PV to provide storage to a Pod
-
-In simple terms:
-
-> **PV is the storage, and PVC is the request for storage by Pods.**
-
----
-
-## 🎓 What You Learn from PV and PVC
-
-By working with PV and PVC manifests, you will understand:
-
-* Static and dynamic provisioning of storage
-* How PVC binds to PV
-* Access modes (`ReadWriteOnce`, `ReadOnlyMany`, `ReadWriteMany`)
-* Storage capacity and reclaim policies
-* Integrating PV/PVC with Pods and StatefulSets
-
----
-
-## 🧩 Core Fields Used in PV YAML
-
+### PersistentVolume (PV)
 * **apiVersion**: `v1`
 * **kind**: `PersistentVolume`
-* **metadata.name**: PV name
-* **spec.capacity.storage**: Size of the volume (e.g., 1Gi)
-* **spec.accessModes**: `ReadWriteOnce`, `ReadOnlyMany`, `ReadWriteMany`
-* **spec.persistentVolumeReclaimPolicy**: `Retain`, `Recycle`, `Delete`
-* **spec.storageClassName**: StorageClass name (optional)
-* **spec.hostPath** or other volume type (e.g., NFS, AWS EBS)
+* **spec.capacity.storage**: Total capacity allocated (e.g. `5Gi`).
+* **spec.accessModes**:
+  - `ReadWriteOnce` (RWO): Mounted read-write by a single node.
+  - `ReadOnlyMany` (ROM): Mounted read-only by many nodes.
+  - `ReadWriteMany` (RWM): Mounted read-write by many nodes.
+* **spec.persistentVolumeReclaimPolicy**:
+  - `Retain` (default): PV remains; data must be manually cleaned.
+  - `Delete`: Automatically deletes the backend physical storage (common in cloud).
+  - `Recycle`: Performs basic scrub (`rm -rf`) and makes volume available again.
+* **spec.hostPath**: Local path on the worker node hosting the volume (for development only).
 
-**Example PV YAML:**
+### PersistentVolumeClaim (PVC)
+* **apiVersion**: `v1`
+* **kind**: `PersistentVolumeClaim`
+* **spec.resources.requests.storage**: Requested volume capacity.
+* **spec.storageClassName**: Storage class reference (must match the target PV).
 
+---
+
+## 📘 Practical Examples
+
+### 1. Combined PV & PVC Manifest (`pv-pvc.yaml`)
 ```yaml
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pv-example
+  name: pv-local
 spec:
   capacity:
-    storage: 1Gi
+    storage: 5Gi
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual                   # Matches storageClassName in PVC
   hostPath:
-    path: /mnt/data
-```
-
+    path: /mnt/data                          # Local directory on worker node
 ---
-
-## 🧩 Core Fields Used in PVC YAML
-
-* **apiVersion**: `v1`
-* **kind**: `PersistentVolumeClaim`
-* **metadata.name**: PVC name
-* **spec.accessModes**: Must match PV access mode
-* **spec.resources.requests.storage**: Requested storage size
-* **spec.storageClassName**: Optional, must match PV storageClassName
-
-**Example PVC YAML:**
-
-```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: pvc-example
+  name: pvc-local
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
+      storage: 5Gi
+  storageClassName: manual                   # Matches storageClassName in PV
 ```
 
 ---
 
-## ▶️ kubectl Commands (Apply, Verify & Describe)
+## ▶️ kubectl Operations
 
-Apply PV manifests:
-
+### Apply the Manifests
 ```bash
-kubectl apply -f kubernetes_manifest_files/PersistentVolume/pv-*.yaml
+# Apply PV, PVC, and mounting Pod configs
+kubectl apply -f kubernetes_manifest_files/PersistentVolume/
 ```
 
-Apply PVC manifests:
-
+### Verify Bindings
 ```bash
-kubectl apply -f kubernetes_manifest_files/PersistentVolume/pvc-*.yaml
-```
-
-Verify PVs and PVCs:
-
-```bash
+# View Persistent Volumes (Status should show 'Bound')
 kubectl get pv
+
+# View Persistent Volume Claims (Status should show 'Bound')
 kubectl get pvc
 ```
 
-Describe a PV or PVC:
-
+### Delete Storage Resources
 ```bash
-kubectl describe pv <pv-name>
-kubectl describe pvc <pvc-name>
-```
-
-Delete PV or PVC:
-
-```bash
-kubectl delete pv <pv-name>
-kubectl delete pvc <pvc-name>
+# Delete the PVC first, then the PV
+kubectl delete -f kubernetes_manifest_files/PersistentVolume/
 ```
 
 ---
 
-## 🔍 PV & PVC Working Flow
+## 🛡️ Best Practices & Common Mistakes
 
-1. PV is created by admin (static) or dynamically via StorageClass
-2. PVC is created by a user requesting storage
-3. Kubernetes binds PVC to a matching PV
-4. Pod consumes storage via PVC
-5. PV retains data based on `persistentVolumeReclaimPolicy`
-
-```
-PV → PVC → Pod → Persistent Storage
-```
+* **Reclaim Policies:** In production, use `Retain` or `Delete` depending on whether data safety or automated cleanup is preferred. Never use `Recycle` as it is deprecated.
+* **AccessMode Restrictions:** Local volumes (like `hostPath` or `local` directories) only support `ReadWriteOnce`. They cannot be shared across multiple nodes.
+* **Match storageClassNames:** Ensure that both the static PV and the PVC define matching `storageClassName` properties (e.g. `manual`) to prevent Kubernetes from attempting dynamic provisioning using the default storage class.
 
 ---
 
-## 🧪 Common Use Cases
+## 🛣️ Learning Path Navigation
 
-* Databases (MySQL, PostgreSQL, MongoDB)
-* Stateful applications requiring persistent storage
-* Sharing data across Pods
-* Backup and restore of application data
-
----
-
-## ⚠️ Common Mistakes
-
-* Mismatched PVC and PV access modes
-* Insufficient storage capacity
-* Misconfigured storage path or type
-* Forgetting to set `persistentVolumeReclaimPolicy`
-* Not specifying correct StorageClass for dynamic provisioning
-
----
-
-## ✅ Best Practices
-
-* Use StorageClass for dynamic provisioning whenever possible
-* Define access modes based on application requirements
-* Set `persistentVolumeReclaimPolicy` thoughtfully
-* Monitor PV and PVC usage and status
-* Combine PV/PVC with StatefulSets for stable stateful applications
-
----
-
-## 🛣️ Learning Path Linkage
-
-### Before PV/PVC
-
-➡️ **Pod → Deployment → Service → Ingress → HPA → StatefulSet**
-
-Understand workload deployment, autoscaling, and stateful application management
-
-### After PV/PVC
-
-➡️ **Static Provisioning PV / Dynamic Provisioning PV**
-
-Learn advanced storage provisioning methods and cluster storage management
-
----
-
-## 📬 Support & Contributions
-
-For questions, issues, or improvements:
-
-* Open a GitHub issue
-* Submit a Pull Request
-
----
-
-Happy Kubernetes Persistent Storage Management with PV & PVC! 🚀
+    ⏮️ **[HPA](../HPA/README.md)** | ⏭️ **[Static Provisioning PV](../Static%20Provisioning%20PV/README.md)**

@@ -1,8 +1,8 @@
-# Kubernetes Ingress Manifests
+# ☸️ Kubernetes Ingress Manifests
 
-This folder contains **Kubernetes Ingress manifest files**. An **Ingress** is a collection of rules that allow **external HTTP and HTTPS traffic** to reach Kubernetes Services.
+This folder contains **Kubernetes Ingress manifest examples**. An **Ingress** is an API object that manages external access to the services in a cluster, typically HTTP and HTTPS. 
 
-Ingress provides **fine-grained routing, SSL termination, and name-based virtual hosting**, acting as an entry point to your cluster's applications.
+Ingress provides Layer 7 routing rules, allowing you to expose multiple microservices under a single IP address or domain name. It supports path-based routing (e.g. `/app1` vs `/app2`), host-based routing (e.g. `app1.example.com` vs `app2.example.com`), and TLS/SSL termination.
 
 ---
 
@@ -11,202 +11,90 @@ Ingress provides **fine-grained routing, SSL termination, and name-based virtual
 ```
 kubernetes_manifest_files/
 └── Ingress/
-    ├── ingress-host-based-routing.yaml   
-    ├── ingress-path-based-routing.yaml
-    ├── ingress-setup.md
-    └── README.md
+    ├── ingress-host-based-routing.yaml   # Host-based routing template
+    ├── ingress-path-based routing.yaml   # Path-based routing template (rewrite-target)
+    ├── ingress-setup.md                  # Detailed controller setup guide
+    └── README.md                         # This documentation file
 ```
-
-This folder includes YAML files defining Ingress resources.
-
----
-
-## 📘 What is a Kubernetes Ingress?
-
-An **Ingress** manages external access to services in a cluster, typically HTTP/HTTPS. It:
-
-* Provides routing based on host and path
-* Supports TLS/SSL termination
-* Enables name-based virtual hosting
-* Works with Ingress Controllers for traffic management
-
-In simple terms:
-
-> **Ingress is like a smart router that controls HTTP/HTTPS traffic into your cluster.**
-
-Ingress supports two primary routing types:
-
-1. **Host-based routing** – routes requests based on the `host` field (e.g., `example.com`) to different services.
-2. **Path-based routing** – routes requests based on the URL `path` (e.g., `/app` or `/blog`) to specific services.
-
----
-
-## 🎓 What You Learn from Ingress
-
-By working with Ingress manifests, you will understand:
-
-* How external traffic enters a Kubernetes cluster
-* Path-based and host-based routing
-* TLS/SSL setup for secure communication
-* Integration with Services and Deployments
-* Role of Ingress Controllers
 
 ---
 
 ## 🧩 Core Fields Used in Ingress YAML
 
-A typical Ingress manifest includes:
-
 * **apiVersion**: `networking.k8s.io/v1`
 * **kind**: `Ingress`
-* **metadata**:
+* **metadata**: Name, namespace, and critical annotations (e.g., `nginx.ingress.kubernetes.io/rewrite-target`).
+* **spec**: Specifies the Ingress routing rules:
+  * **ingressClassName**: Identifies the Ingress Controller (e.g., `nginx`).
+  * **rules**: List of routing hosts and HTTP paths:
+    - **host**: The domain name (e.g., `example.com`).
+    - **http.paths**:
+      - **path**: The URL path prefix or exact match.
+      - **pathType**: Match algorithm (usually `Prefix` or `Exact`).
+      - **backend**: The target Service (`service.name`) and destination port (`service.port.number`).
+  * **tls**: Configures secure HTTPS connections by referencing a Kubernetes Secret.
 
-  * `name`: Ingress name
-  * `annotations`: Metadata for ingress controller configuration
-* **spec**:
+---
 
-  * `ingressClassName`: Specifies the Ingress Controller
-  * `tls` (optional): TLS configuration
+## 📘 Practical Examples
 
-    * `hosts`: List of hosts for TLS
-    * `secretName`: TLS secret containing certificate and key
-  * `rules`: Array of routing rules
-
-    * `host`: Domain name for host-based routing
-    * `http.paths`: Array of path rules for path-based routing
-
-      * `path`: URL path
-      * `pathType`: `Prefix` or `Exact`
-      * `backend.service.name`: Target Service name
-      * `backend.service.port.number`: Service port
-
-**Example YAML with host and path-based routing:**
-
+### 1. Path-Based Ingress Manifest (`ingress-path-based routing.yaml`)
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: example-ingress
+  name: path-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /    # NGINX specific rewrite rule
 spec:
-  ingressClassName: nginx
-  tls:
-  - hosts:
-    - example.com
-    secretName: example-tls
+  ingressClassName: nginx                             # Tells NGINX controller to process this
   rules:
-  - host: example.com        # Host-based routing
-    http:
-      paths:
-      - path: /app            # Path-based routing
-        pathType: Prefix
-        backend:
-          service:
-            name: app-service
-            port:
-              number: 80
-      - path: /blog           # Another path-based route
-        pathType: Prefix
-        backend:
-          service:
-            name: blog-service
-            port:
-              number: 80
+    - host: example.com
+      http:
+        paths:
+          - path: /app1
+            pathType: Prefix
+            backend:
+              service:
+                name: app1-service
+                port:
+                  number: 80
+          - path: /app2
+            pathType: Prefix
+            backend:
+              service:
+                name: app2-service
+                port:
+                  number: 80
 ```
 
 ---
 
-## ▶️ kubectl Commands (Apply, Verify & Describe)
+## ▶️ kubectl Operations
 
-Apply Ingress manifests:
+> ⚠️ **Prerequisite:** Ingress resources require an **Ingress Controller** (such as NGINX Ingress Controller) to be installed in the cluster. See [ingress-setup.md](./ingress-setup.md) for installation steps.
 
+### Apply the Manifests
 ```bash
 kubectl apply -f kubernetes_manifest_files/Ingress/
 ```
 
-Verify Ingress resources:
-
+### Verify & Describe
 ```bash
+# List Ingress resources and their assigned IP address
 kubectl get ingress
+
+# View detailed routing tables and annotation configurations
+kubectl describe ingress path-ingress
 ```
 
-Describe an Ingress:
-
+### Delete Ingress
 ```bash
-kubectl describe ingress <ingress-name>
-```
-
-Check endpoints via Service:
-
-```bash
-kubectl get svc <service-name>
+kubectl delete -f kubernetes_manifest_files/Ingress/
 ```
 
 ---
 
-## 🔍 Ingress Working Flow
+## 🛣️ Learning Path Navigation
 
-1. External client sends HTTP/HTTPS request
-2. DNS resolves to Ingress Controller (LoadBalancer/NodePort)
-3. Ingress Controller evaluates **host and path rules**
-4. Request is routed to the appropriate Service
-5. Service forwards traffic to Pods
-
-```
-Client → Ingress Controller → Service → Pods
-```
-
----
-
-## 🧪 Common Use Cases
-
-* Exposing multiple services via a single IP/Domain
-* Implementing TLS/SSL termination
-* Path-based routing for microservices
-* Host-based routing for multiple domains
-* Name-based virtual hosting
-
----
-
-## ⚠️ Common Mistakes
-
-* Not installing an Ingress Controller
-* Missing `ingressClassName` or incorrect annotations
-* Service names or ports mismatched in backend
-* Forgetting TLS secret configuration
-
----
-
-## ✅ Best Practices
-
-* Use an Ingress Controller (e.g., NGINX, Traefik) compatible with your cluster
-* Use TLS for secure traffic
-* Validate Service names and ports
-* Keep path and host rules clear and organized
-* Monitor Ingress logs and metrics for traffic issues
-
----
-
-## 🛣️ Learning Path Linkage
-
-### Before Ingress
-
-➡️ **Pod → Deployment → Service → Namespace**
-Understand resource deployment, scaling, and service exposure
-
-### After Ingress
-
-➡️ **HPA → PersistentVolume / PVC**
-Learn autoscaling and storage management with cluster access
-
----
-
-## 📬 Support & Contributions
-
-For questions, issues, or improvements:
-
-* Open a GitHub issue
-* Submit a Pull Request
-
----
-
-Happy Kubernetes Traffic Management with Ingress! 🚀
+    ⏮️ **[Service](../Service/README.md)** | ⏭️ **[API Gateway](../API%20Gateway/README.md)**

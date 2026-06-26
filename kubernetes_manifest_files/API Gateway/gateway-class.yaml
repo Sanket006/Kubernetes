@@ -1,0 +1,6 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: example-gateway-class
+spec:
+  controllerName: example.com/gateway-controller  # Replace with the actual controller provider (e.g. nginx.org/gateway-controller)

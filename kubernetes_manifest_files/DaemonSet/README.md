@@ -1,8 +1,8 @@
-# Kubernetes DaemonSet Manifests
+# ☸️ Kubernetes DaemonSet Manifests
 
-This folder contains **Kubernetes DaemonSet manifest files**. A **DaemonSet** ensures that a copy of a Pod runs on **all or selected nodes** in a cluster.
+This folder contains **Kubernetes DaemonSet manifest examples**. A **DaemonSet** ensures that a copy of a Pod runs on all (or selected) nodes in a cluster. 
 
-DaemonSets are used for cluster-level services like log collection, monitoring agents, or networking components.
+DaemonSets are typically used for cluster-level services and infrastructure agents, such as log collectors (e.g., Fluentd, Logstash), monitoring agents (e.g., Prometheus node exporter), and networking plugins (e.g., Calico).
 
 ---
 
@@ -11,190 +11,95 @@ DaemonSets are used for cluster-level services like log collection, monitoring a
 ```
 kubernetes_manifest_files/
 └── DaemonSet/
-    ├── daemonset.yaml 
-    ├── nginx-daemonset-service.yaml  
-    └── README.md
+    ├── daemonset.yaml                 # Basic DaemonSet manifest (nginx)
+    ├── nginx-daemonset-service.yaml   # Combined DaemonSet and NodePort Service
+    └── README.md                      # This documentation file
 ```
-
-This folder includes YAML files defining DaemonSet resources.
-
----
-
-## 📘 What is a Kubernetes DaemonSet?
-
-A **DaemonSet** is a controller that:
-
-* Ensures a Pod runs on every node (or selected nodes) in the cluster
-* Automatically adds Pods to new nodes when they join
-* Deletes Pods from nodes when they are removed from the DaemonSet
-
-In simple terms:
-
-> **DaemonSet runs one or more Pods on every node for cluster-level tasks.**
-
----
-
-## 🎓 What You Learn from DaemonSets
-
-By working with DaemonSet manifests, you will understand:
-
-* Running cluster-wide services automatically
-* Scheduling Pods on specific nodes using node selectors or tolerations
-* Integration with logging, monitoring, and networking tools
 
 ---
 
 ## 🧩 Core Fields Used in DaemonSet YAML
 
-A typical DaemonSet manifest includes:
-
 * **apiVersion**: `apps/v1`
 * **kind**: `DaemonSet`
-* **metadata**:
+* **metadata**: Name, namespace, and labels to identify the DaemonSet.
+* **spec**: Specifies the DaemonSet configuration:
+  * **selector**: Match labels used to identify Pods managed by the DaemonSet.
+  * **template**: Pod template describing the containers to launch.
+    * **spec.tolerations**: Allows DaemonSet Pods to run on tainted nodes (like master/control-plane nodes).
+  * **updateStrategy**:
+    * **type**: `RollingUpdate` (default) or `OnDelete`.
 
-  * `name`: DaemonSet name
-  * `labels`: Metadata labels
-* **spec**:
+---
 
-  * `selector.matchLabels`: Labels used to manage Pods
-  * `template`: Pod template
+## 📘 Practical Examples
 
-    * `metadata.labels`: Must match selector
-    * `spec.containers`: Container definitions
-
-      * `image`: Container image
-      * `ports`: Container ports
-      * `resources`: CPU/memory requests & limits
-  * **updateStrategy**: RollingUpdate or OnDelete
-
-**Example YAML:**
-
+### 1. Production-Ready DaemonSet Manifest (`daemonset.yaml`)
 ```yaml
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: node-monitor
+  name: nginx-daemonset
+  labels:
+    app: nginx-daemon
 spec:
   selector:
     matchLabels:
-      app: node-monitor
+      app: nginx-daemon
   template:
     metadata:
       labels:
-        app: node-monitor
+        app: nginx-daemon
     spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
       containers:
-      - name: node-monitor
-        image: myorg/node-monitor:1.0
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 200m
-            memory: 256Mi
-  updateStrategy:
-    type: RollingUpdate
+        - name: nginx-container
+          image: nginx:1.25.3-alpine         # Pinned version (Best Practice)
+          ports:
+            - containerPort: 80
+          resources:                         # Requests/limits (Best Practice)
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
 ```
 
 ---
 
-## ▶️ kubectl Commands (Apply, Verify & Describe)
+## ▶️ kubectl Operations
 
-Apply DaemonSet manifests:
-
+### Apply the Manifests
 ```bash
 kubectl apply -f kubernetes_manifest_files/DaemonSet/
 ```
 
-Verify DaemonSets:
-
+### Verify & Describe
 ```bash
-kubectl get daemonsets
-```
+# Get list of running DaemonSets
+kubectl get ds
 
-Check Pods created by DaemonSet:
+# View detailed information of a DaemonSet
+kubectl describe ds nginx-daemonset
 
-```bash
+# Check that Pods run on all nodes (compare count to node count)
 kubectl get pods -o wide
 ```
 
-Describe a DaemonSet:
-
+### Delete DaemonSet
 ```bash
-kubectl describe daemonset <daemonset-name>
-```
-
-Delete a DaemonSet:
-
-```bash
-kubectl delete daemonset <daemonset-name>
+kubectl delete -f kubernetes_manifest_files/DaemonSet/
 ```
 
 ---
 
-## 🔍 DaemonSet Working Flow
+## 🛣️ Learning Path Navigation
 
-1. DaemonSet is created with Pod template
-2. Kubernetes ensures Pods are deployed on all nodes (or matching nodes)
-3. Pods are automatically added to new nodes
-4. Pods are deleted when nodes are removed or DaemonSet is deleted
-
-```
-DaemonSet → Pods (one per node) → Cluster-wide Service
-```
-
----
-
-## 🧪 Common Use Cases
-
-* Log collection agents (e.g., Fluentd, Logstash)
-* Monitoring agents (e.g., Prometheus node exporter)
-* Networking components (e.g., Calico, Weave Net)
-* Security scanning agents
-
----
-
-## ⚠️ Common Mistakes
-
-* Not using correct labels for selector and template
-* Running DaemonSet Pods without resource limits
-* Forgetting tolerations for tainted nodes
-* Not testing update strategy in production
-
----
-
-## ✅ Best Practices
-
-* Use node selectors or affinities for specific node workloads
-* Set resource requests and limits
-* Use RollingUpdate strategy for zero-downtime updates
-* Include tolerations for nodes with taints
-* Monitor DaemonSet Pods for cluster-wide performance
-
----
-
-## 🛣️ Learning Path Linkage
-
-### Before DaemonSet
-
-➡️ **Pod → Deployment → ReplicaSet / StatefulSet**
-Understand Pod lifecycle and scaling
-
-### After DaemonSet
-
-➡️ **Service → Ingress → HPA**
-Learn traffic routing, networking, and autoscaling
-
----
-
-## 📬 Support & Contributions
-
-For questions, issues, or improvements:
-
-* Open a GitHub issue
-* Submit a Pull Request
-
----
-
-Happy Kubernetes Cluster-Wide Management with DaemonSets! 🚀
+⏮️ **[Deployment](../Deployment/README.md)** | ⏭️ **[StatefulSet](../StatefulSet/README.md)**

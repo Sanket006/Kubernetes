@@ -1,8 +1,8 @@
-# Kubernetes Secret Manifests
+# ☸️ Kubernetes Secret Manifests
 
-This folder contains **Kubernetes Secret manifest files**. A **Secret** is a Kubernetes object used to store **sensitive information** such as passwords, tokens, and keys.
+This folder contains **Kubernetes Secret manifest examples**. A **Secret** is an API object used to store and manage sensitive information, such as passwords, OAuth tokens, ssh keys, and certificates.
 
-Secrets help you **keep confidential data separate from Pod definitions** and prevent exposing sensitive data in plain text.
+Storing confidential data in a Secret is safer and more flexible than putting it verbatim in a Pod definition or container image. This decoupling allows you to control access to sensitive configurations separately from resource templates.
 
 ---
 
@@ -11,189 +11,100 @@ Secrets help you **keep confidential data separate from Pod definitions** and pr
 ```
 kubernetes_manifest_files/
 └── Secret/
-    ├── secret-pod-envfrom.yaml   
-    ├── secret-pod.yaml
-    ├── secret.yaml
-    └── README.md
+    ├── secret.yaml              # Base64-encoded Opaque Secret definition
+    ├── secret-pod.yaml          # Pod mounting Secret as files or specific key envs
+    ├── secret-pod-envfrom.yaml  # Pod injecting all keys from Secret as env vars
+    └── README.md                # This documentation file
 ```
-
-This folder includes YAML files defining Secret resources.
-
----
-
-## 📘 What is a Kubernetes Secret?
-
-A **Secret** stores sensitive information securely. Key points:
-
-* Data is base64-encoded (not encrypted by default)
-* Can be consumed as environment variables, mounted files, or image pull secrets
-* Keeps sensitive data separate from container images and manifests
-
-In simple terms:
-
-> **Secret lets you provide sensitive data to Pods without exposing it in plain text.**
-
----
-
-## 🎓 What You Learn from Secrets
-
-By working with Secret manifests, you will understand:
-
-* How to store sensitive data in Kubernetes
-* How to consume Secrets as environment variables or volume-mounted files
-* How to use Secrets for image pull credentials
-* Best practices for securing sensitive data in Kubernetes
 
 ---
 
 ## 🧩 Core Fields Used in Secret YAML
 
-A typical Secret manifest includes:
-
 * **apiVersion**: `v1`
 * **kind**: `Secret`
-* **metadata**:
+* **metadata**: Name, namespace, and labels.
+* **type**: Defines the Secret category:
+  - `Opaque` (default): Arbitrary user-defined data.
+  - `kubernetes.io/tls`: Public/private TLS certificate keys.
+  - `kubernetes.io/dockerconfigjson`: Docker registry credentials.
+* **data**: Key-value pairs containing **base64-encoded** strings.
+* **stringData**: Optional field to write plain-text values that Kubernetes will automatically base64-encode during creation.
 
-  * `name`: Secret name
-  * `namespace`: Namespace (optional)
-* **type**: Type of Secret (`Opaque`, `kubernetes.io/dockerconfigjson`, `kubernetes.io/tls`, etc.)
-* **data**: Base64-encoded key-value pairs
-* **stringData**: Optional, plain text key-value pairs that Kubernetes will encode automatically
+---
 
-**Example YAML (Opaque Secret):**
+## 📘 Practical Examples
 
+### 1. Secret Manifest (`secret.yaml`)
 ```yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: db-secret
+  name: app-secret
 type: Opaque
 data:
-  username: YWRtaW4=   # base64 for 'admin'
-  password: MWYyZDFlMmU2N2Rm   # base64 for '1f2d1e2e67df'
+  MYSQL_USER: dGVzdHVzZXI=                   # base64 for 'testuser'
+  MYSQL_PASSWORD: dGVzdHBhc3M=               # base64 for 'testpass'
+  API_KEY: YXBpa2V5MTIzNDU=                  # base64 for 'apikey12345'
 ```
 
-Consume in Pod as environment variables:
-
+### 2. Injecting Secrets as Environment Variables (`secret-pod-envfrom.yaml`)
 ```yaml
 apiVersion: v1
 kind: Pod
 metadata:
-  name: app-pod
+  name: myapp-pod
 spec:
   containers:
-  - name: app-container
-    image: myapp:1.0
-    env:
-    - name: DB_USER
-      valueFrom:
-        secretKeyRef:
-          name: db-secret
-          key: username
-    - name: DB_PASS
-      valueFrom:
-        secretKeyRef:
-          name: db-secret
-          key: password
+    - name: myapp-container
+      image: nginx:1.25.3-alpine
+      envFrom:
+        - secretRef:
+            name: app-secret                 # Injects all key-value pairs as env vars
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "128Mi"
+          cpu: "200m"
 ```
 
 ---
 
-## ▶️ kubectl Commands (Apply, Verify & Describe)
+## ▶️ kubectl Operations
 
-Apply Secret manifests:
-
+### Apply the Manifests
 ```bash
 kubectl apply -f kubernetes_manifest_files/Secret/
 ```
 
-Verify Secrets:
-
+### Verify & Decode Secrets
 ```bash
+# List all Secrets
 kubectl get secrets
+
+# View Secret metadata (Values are hidden under 'describe')
+kubectl describe secret app-secret
+
+# Decode and view the plain text password value
+kubectl get secret app-secret -o jsonpath="{.data.MYSQL_PASSWORD}" | base64 --decode
 ```
 
-Describe a Secret:
-
+### Delete Secret
 ```bash
-kubectl describe secret <secret-name>
-```
-
-Decode Secret values:
-
-```bash
-kubectl get secret <secret-name> -o jsonpath="{.data.username}" | base64 --decode
-```
-
-Delete a Secret:
-
-```bash
-kubectl delete secret <secret-name>
+kubectl delete -f kubernetes_manifest_files/Secret/
 ```
 
 ---
 
-## 🔍 Secret Working Flow
+## 🛡️ Best Practices & Common Mistakes
 
-1. Create a Secret with sensitive data
-2. Pod references Secret via environment variables, volume, or image pull
-3. Pod consumes the Secret data securely
-
-```
-Secret → Pod (Env vars / Volume / Image Pull) → Application
-```
+* **Base64 is NOT Encryption:** Base64 is merely encoding and can be easily decoded. Enable **Encryption at Rest** in your Kubernetes API server and use role-based access control (RBAC) to lock down secret access.
+* **Mounting Secrets as Volumes:** Mount secrets as files for security-sensitive operations like TLS certificates. Mounted secrets are dynamically updated in the container when changed.
 
 ---
 
-## 🧪 Common Use Cases
+## 🛣️ Learning Path Navigation
 
-* Database credentials
-* API keys and tokens
-* TLS certificates
-* Docker registry authentication
-
----
-
-## ⚠️ Common Mistakes
-
-* Storing Secrets in plain text in manifests or images
-* Not using correct Secret type for use case
-* Not restricting namespace or RBAC access
-* Forgetting to decode base64 values when necessary
-
----
-
-## ✅ Best Practices
-
-* Use Secrets for all sensitive data
-* Use RBAC to control access to Secrets
-* Avoid embedding Secrets in container images or ConfigMaps
-* Use `stringData` for simplicity when creating Secrets
-* Combine with volume mounts for TLS certificates or configuration files
-
----
-
-## 🛣️ Learning Path Linkage
-
-### Before Secret
-
-➡️ **ConfigMap → Namespace**
-Understand non-sensitive configuration management and namespace isolation
-
-### After Secret
-
-➡️ **DaemonSet → StatefulSet → HPA → PersistentVolume / PVC**
-Learn cluster-wide services, stateful workloads, autoscaling, and persistent storage
-
----
-
-## 📬 Support & Contributions
-
-For questions, issues, or improvements:
-
-* Open a GitHub issue
-* Submit a Pull Request
-
----
-
-Happy Kubernetes Secret Management! 🔐
+    ⏮️ **[ConfigMap](../ConfigMap/README.md)** | ⏭️ **[HPA](../HPA/README.md)**

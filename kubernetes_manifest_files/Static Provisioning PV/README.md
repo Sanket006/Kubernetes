@@ -1,10 +1,8 @@
-# Kubernetes Static Provisioning PV Manifests
+# ☸️ Kubernetes Static Provisioning PV Manifests
 
-This folder contains **Kubernetes PersistentVolume (PV) manifests for Static Provisioning**.
+This folder contains **Kubernetes Static Provisioning PV manifest examples**. 
 
-**Static provisioning** means that cluster administrators manually create PersistentVolumes ahead of time. Users then create PersistentVolumeClaims (PVCs) that match these pre-created PVs.
-
-Static provisioning is useful when you have **pre-existing storage resources** or need **fine-grained control** over volume allocation.
+**Static Provisioning** means a cluster administrator manually provisions raw physical storage resources (such as AWS EBS volumes, local disks, or NFS folders) and creates `PersistentVolume` resources in the cluster ahead of time. Developers then create `PersistentVolumeClaims` that declare storage requirements matching the capacity and parameters of these pre-created PVs.
 
 ---
 
@@ -13,198 +11,93 @@ Static provisioning is useful when you have **pre-existing storage resources** o
 ```
 kubernetes_manifest_files/
 └── Static Provisioning PV/
-    ├── AWS EBS + PV + PVC ManifestFile.yaml    
-    └── README.md
+    ├── AWS EBS + PV + PVC Manifest File.yaml  # Combined static AWS EBS volume manifest
+    └── README.md                              # This documentation file
 ```
 
-This folder includes YAML files defining PV and PVC resources for static provisioning.
-
 ---
 
-## 📘 What is Static Provisioning in Kubernetes?
-
-**Static Provisioning** requires administrators to manually create PVs that define storage capacity, access modes, and reclaim policies.
-
-Key points:
-
-* PVs are pre-created by admin
-* PVCs bind to matching PVs automatically
-* Useful for on-prem storage or specialized storage setups
-
-In simple terms:
-
-> **Static provisioning is manual storage allocation where PVs are created first and Pods request them via PVCs.**
-
----
-
-## 🎓 What You Learn from Static Provisioning
-
-By working with static provisioning manifests, you will understand:
-
-* How to pre-create PVs and manage storage manually
-* How PVCs claim pre-existing PVs
-* Access modes and storage policies
-* Reclaim policies (`Retain`, `Recycle`, `Delete`)
-* Integration with StatefulSets and Pods
-
----
-
-## 🧩 Core Fields Used in PV YAML (Static Provisioning)
+## 🧩 Core Fields Used in Static Provisioning YAML
 
 * **apiVersion**: `v1`
-* **kind**: `PersistentVolume`
-* **metadata.name**: PV name
-* **spec.capacity.storage**: Size of the volume (e.g., 5Gi)
-* **spec.accessModes**: `ReadWriteOnce`, `ReadOnlyMany`, `ReadWriteMany`
-* **spec.persistentVolumeReclaimPolicy**: `Retain`, `Recycle`, `Delete`
-* **spec.storageClassName**: Optional, must match PVC if used
-* **spec.hostPath** or other volume type (e.g., NFS)
+* **kind**: `PersistentVolume` / `PersistentVolumeClaim` / `Pod`
+* **spec.awsElasticBlockStore** (PV specific):
+  - **volumeID**: The physical AWS EBS volume identifier (e.g. `vol-0abcd1234ef567890`).
+  - **fsType**: Filesystem type to initialize (e.g. `ext4`).
+* **spec.nodeAffinity** (PV specific): Restricts volume mounting to specific Availability Zones (AZ) matching the physical EBS storage location.
 
-**Example PV YAML:**
+---
 
+## 📘 Practical Examples
+
+### 1. Static AWS EBS Volume Manifest (`AWS EBS + PV + PVC Manifest File.yaml`)
 ```yaml
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pv-static-example
+  name: ebs-pv
 spec:
   capacity:
     storage: 5Gi
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
-  hostPath:
-    path: /mnt/data/static
-```
-
+  storageClassName: ""                        # Empty string prevents dynamic matching
+  awsElasticBlockStore:
+    volumeID: vol-0abcd1234ef567890           # Physical AWS EBS volume ID
+    fsType: ext4
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: topology.kubernetes.io/zone
+              operator: In
+              values:
+                - ap-south-1a                 # EBS volume must match the Node AZ
 ---
-
-## 🧩 Core Fields Used in PVC YAML
-
-* **apiVersion**: `v1`
-* **kind**: `PersistentVolumeClaim`
-* **metadata.name**: PVC name
-* **spec.accessModes**: Must match PV access mode
-* **spec.resources.requests.storage**: Requested storage size
-* **spec.storageClassName**: Optional, should match PV if defined
-
-**Example PVC YAML:**
-
-```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: pvc-static-example
+  name: ebs-pvc
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
       storage: 5Gi
+  storageClassName: ""                        # Binds manually to the empty storageClass PV above
 ```
 
 ---
 
-## ▶️ kubectl Commands (Apply, Verify & Describe)
+## ▶️ kubectl Operations
 
-Apply PV manifests:
-
+### Apply the Manifests
 ```bash
-kubectl apply -f kubernetes_manifest_files/Static\ Provisioning\ PV/pv-*.yaml
+# Note: Escape the folder name with double quotes or backslashes in your shell
+kubectl apply -f "kubernetes_manifest_files/Static Provisioning PV/AWS EBS + PV + PVC Manifest File.yaml"
 ```
 
-Apply PVC manifests:
-
+### Verify Binding
 ```bash
-kubectl apply -f kubernetes_manifest_files/Static\ Provisioning\ PV/pvc-*.yaml
+# Verify the PVC binds successfully to the static EBS PV
+kubectl get pv,pvc
 ```
 
-Verify PVs and PVCs:
-
+### Delete Resources
 ```bash
-kubectl get pv
-kubectl get pvc
-```
-
-Describe PV or PVC:
-
-```bash
-kubectl describe pv <pv-name>
-kubectl describe pvc <pvc-name>
-```
-
-Delete PV or PVC:
-
-```bash
-kubectl delete pv <pv-name>
-kubectl delete pvc <pvc-name>
+kubectl delete -f "kubernetes_manifest_files/Static Provisioning PV/AWS EBS + PV + PVC Manifest File.yaml"
 ```
 
 ---
 
-## 🔍 Static Provisioning Working Flow
+## 🛡️ Best Practices & Common Mistakes
 
-1. Administrator creates PV with desired capacity and access modes
-2. User creates PVC requesting storage
-3. Kubernetes binds PVC to a matching PV
-4. Pod consumes storage via PVC
-5. PV retains data based on `persistentVolumeReclaimPolicy`
-
-```
-PV (pre-created) → PVC → Pod → Persistent Storage
-```
+* **Zone Match constraint:** Physical block storage (like AWS EBS or GCP Persistent Disk) is bound to a specific availability zone (AZ). If your cluster nodes span multiple zones, you **must** use `nodeAffinity` in your static PV to guarantee Pods are only scheduled on nodes located in the same zone as the disk.
+* **StorageClass Override:** To bind manually to a static PV without a dynamic storage class overriding the request, set `storageClassName: ""` (empty string) in both the PV and the PVC.
 
 ---
 
-## 🧪 Common Use Cases
+## 🛣️ Learning Path Navigation
 
-* On-prem storage with pre-allocated volumes
-* Applications requiring exact storage configuration
-* Backup and archival systems
-
----
-
-## ⚠️ Common Mistakes
-
-* PVC access modes not matching PV
-* Storage size mismatch between PV and PVC
-* Misconfigured storage path or type
-* Forgetting to set reclaim policy
-* Not defining storageClassName correctly if used
-
----
-
-## ✅ Best Practices
-
-* Pre-create PVs for known workloads
-* Ensure PVC access mode matches PV
-* Set appropriate `persistentVolumeReclaimPolicy`
-* Monitor PV and PVC binding and usage
-* Combine PV/PVC with StatefulSets for stateful applications
-
----
-
-## 🛣️ Learning Path Linkage
-
-### Before Static Provisioning PV
-
-➡️ **PersistentVolume / PVC**
-Understand manual PV and PVC creation
-
-### After Static Provisioning PV
-
-➡️ **Applications & StatefulSets**
-Learn how statically provisioned storage is consumed by Pods and StatefulSets
-
----
-
-## 📬 Support & Contributions
-
-For questions, issues, or improvements:
-
-* Open a GitHub issue
-* Submit a Pull Request
-
----
-
-Happy Kubernetes Static Storage Management! 🚀
+    ⏮️ **[PersistentVolume](../PersistentVolume/README.md)** | ⏭️ **[Dynamic Provisioning PV](../Dynamic%20Provisioning%20PV/README.md)**

@@ -61,10 +61,17 @@ spec:
             - ssd
   containers:
   - name: app
-    image: nginx
+    image: nginx:1.25.3-alpine
     volumeMounts:
     - name: data-storage
       mountPath: /usr/share/nginx/html
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "128Mi"
+        cpu: "200m"
   volumes:
   - name: data-storage
     persistentVolumeClaim:

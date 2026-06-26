@@ -51,10 +51,17 @@ metadata:
 spec:
   containers:
   - name: app
-    image: nginx
+    image: nginx:1.25.3-alpine
     volumeMounts:
     - name: ebs-storage
       mountPath: /data
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "128Mi"
+        cpu: "200m"
   volumes:
   - name: ebs-storage
     persistentVolumeClaim:

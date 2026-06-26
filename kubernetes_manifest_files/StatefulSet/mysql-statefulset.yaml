@@ -1,3 +1,14 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+  labels:
+    app: mysql
+type: Opaque
+data:
+  MYSQL_ROOT_PASSWORD: cm9vdHBhc3N3b3Jk=              # base64 for 'rootpassword'
+  MYSQL_PASSWORD: dGVzdHBhc3M=                       # base64 for 'testpass'
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -17,15 +28,28 @@ spec:
     spec:
       containers:
         - name: mysql
-          image: mysql:8.0
+          image: mysql:8.0.36                         # Pinned version (Best Practice)
           ports:
             - containerPort: 3306
+          resources:                                  # Added CPU/Memory bounds (Best Practice)
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
           env:
             - name: MYSQL_ROOT_PASSWORD
-              value: "rootpassword"   # Set MySQL root password
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_ROOT_PASSWORD
             - name: MYSQL_DATABASE
-              value: "testdb"         # Database to create on startup
+              value: "testdb"                         # Non-sensitive database name
             - name: MYSQL_USER
-              value: "testuser"
+              value: "testuser"                       # Non-sensitive database username
             - name: MYSQL_PASSWORD
-              value: "testpass"
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_PASSWORD

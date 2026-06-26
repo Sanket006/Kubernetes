@@ -1,8 +1,8 @@
-# Kubernetes StatefulSet Manifests
+# ☸️ Kubernetes StatefulSet Manifests
 
-This folder contains **Kubernetes StatefulSet manifest files**. A **StatefulSet** is a controller used to manage **stateful applications** that require **stable, unique network identifiers and persistent storage**.
+This folder contains **Kubernetes StatefulSet manifest examples**. A **StatefulSet** is a workload API object used to manage stateful applications, managing the deployment and scaling of a set of Pods, and providing guarantees about their ordering and uniqueness.
 
-StatefulSets are ideal for databases, messaging systems, and other applications where each Pod needs a consistent identity and storage.
+Unlike a Deployment, a StatefulSet maintains a sticky identity for each of its Pods. These pods are created from the same spec, but are not interchangeable: each has a persistent identifier that it maintains across any rescheduling.
 
 ---
 
@@ -11,203 +11,130 @@ StatefulSets are ideal for databases, messaging systems, and other applications 
 ```
 kubernetes_manifest_files/
 └── StatefulSet/
-    ├── mysql-statefulset-persistentvolume.yaml   
-    ├── mysql-statefulset.yaml
-    ├── nginx-statefulset-service.yaml
-    └── README.md
+    ├── mysql-statefulset.yaml                  # MySQL StatefulSet skeleton (plain-text env)
+    ├── mysql-statefulset-persistentvolume.yaml # MySQL StatefulSet with PVC and Headless Service
+    ├── nginx-statefulset-service.yaml          # Nginx StatefulSet with PVC and Headless Service
+    └── README.md                               # This documentation file
 ```
-
-This folder includes YAML files defining StatefulSet resources.
-
----
-
-## 📘 What is a Kubernetes StatefulSet?
-
-A **StatefulSet** manages the deployment and scaling of a set of Pods, and provides guarantees about the ordering and uniqueness of these Pods:
-
-* Each Pod has a **stable, unique hostname**
-* Pods are **created and deleted in order**
-* Supports **stable persistent storage** via PersistentVolumeClaims
-* Manages scaling, rolling updates, and Pod identity
-
-In simple terms:
-
-> **StatefulSet ensures that stateful applications run reliably with stable identities and storage.**
-
----
-
-## 🎓 What You Learn from StatefulSets
-
-By working with StatefulSet manifests, you will understand:
-
-* How to deploy stateful applications in Kubernetes
-* Pod identity and stable network hostnames
-* Persistent storage integration (PVCs)
-* Ordered deployment, scaling, and termination
-* Rolling updates for stateful workloads
 
 ---
 
 ## 🧩 Core Fields Used in StatefulSet YAML
 
-A typical StatefulSet manifest includes:
-
 * **apiVersion**: `apps/v1`
 * **kind**: `StatefulSet`
-* **metadata**:
+* **metadata**: Name, namespace, and labels to identify the StatefulSet.
+* **spec**: Specifies the StatefulSet behavior:
+  * **serviceName**: The name of the Headless Service that governs this StatefulSet (required for Pod DNS).
+  * **replicas**: Desired number of Pods.
+  * **selector**: Match labels used to identify Pods managed by the StatefulSet.
+  * **template**: Pod template describing the containers.
+  * **volumeClaimTemplates**: A list of PVC templates that Kubernetes will use to dynamically or statically bind persistent volumes to each replica Pod (e.g. `mysql-persistent-storage-mysql-statefulset-0`).
 
-  * `name`: StatefulSet name
-  * `labels`: Metadata labels
-* **spec**:
+---
 
-  * `serviceName`: Governing Service name for network identity
-  * `replicas`: Desired number of Pods
-  * `selector.matchLabels`: Labels used to manage Pods
-  * `template`: Pod template
+## 📘 Practical Examples
 
-    * `metadata.labels`: Must match selector
-    * `spec.containers`: Container definitions
-
-      * `image`: Container image
-      * `ports`: Container ports
-      * `resources`: CPU/memory requests & limits
-  * `volumeClaimTemplates`: PersistentVolumeClaims for stable storage
-  * `updateStrategy`: RollingUpdate or OnDelete
-
-**Example YAML:**
-
+### 1. Nginx StatefulSet Manifest (`nginx-statefulset-service.yaml`)
 ```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-headless
+  labels:
+    app: nginx-stateful
+spec:
+  ports:
+    - port: 80
+      name: web
+  clusterIP: None                            # None = Headless Service (Required)
+  selector:
+    app: nginx-stateful
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: web-statefulset
+  name: nginx-statefulset
 spec:
-  serviceName: "web"
+  serviceName: "nginx-headless"              # Links to the Headless Service above
   replicas: 3
   selector:
     matchLabels:
-      app: nginx
+      app: nginx-stateful
   template:
     metadata:
       labels:
-        app: nginx
+        app: nginx-stateful
     spec:
       containers:
-      - name: nginx
-        image: nginx:1.21
-        ports:
-        - containerPort: 80
-  volumeClaimTemplates:
-  - metadata:
-      name: www
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 1Gi
-  updateStrategy:
-    type: RollingUpdate
+        - name: nginx-container
+          image: nginx:1.25.3-alpine         # Pinned version (Best Practice)
+          ports:
+            - containerPort: 80
+              name: web
+          volumeMounts:
+            - name: nginx-storage
+              mountPath: /usr/share/nginx/html
+          resources:                         # Requests/limits (Best Practice)
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+  volumeClaimTemplates:                      # Volume template for each Pod instance
+    - metadata:
+        name: nginx-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: "manual"
+        resources:
+          requests:
+            storage: 1Gi
 ```
 
 ---
 
-## ▶️ kubectl Commands (Apply, Verify & Describe)
+## ▶️ kubectl Operations
 
-Apply StatefulSet manifests:
-
+### Apply the Manifests
 ```bash
 kubectl apply -f kubernetes_manifest_files/StatefulSet/
 ```
 
-Verify StatefulSets:
-
+### Verify & Describe
 ```bash
+# Get StatefulSets
 kubectl get statefulsets
+
+# Describe a specific StatefulSet
+kubectl describe statefulset mysql-statefulset
+
+# View the stable hostnames and IP addresses of StatefulSet Pods
+kubectl get pods -l app=mysql -o wide
 ```
 
-Check Pods created by StatefulSet:
-
+### Scaling StatefulSets
 ```bash
-kubectl get pods
+kubectl scale statefulset mysql-statefulset --replicas=3
 ```
 
-Describe a StatefulSet:
-
+### Delete StatefulSet (Note: PVCs are retained)
 ```bash
-kubectl describe statefulset <statefulset-name>
-```
-
-Scale a StatefulSet:
-
-```bash
-kubectl scale statefulset <statefulset-name> --replicas=5
+# Deleting a StatefulSet does NOT delete its PVCs/PVs (Best practice for data safety)
+kubectl delete -f kubernetes_manifest_files/StatefulSet/
 ```
 
 ---
 
-## 🔍 StatefulSet Working Flow
+## 🛡️ Best Practices & Common Mistakes
 
-1. StatefulSet is created with desired replicas and Pod template
-2. Pods are created **in order** with unique identities
-3. PersistentVolumeClaims are provisioned for each Pod
-4. Pods are terminated **in reverse order** during scaling down
-5. Rolling updates are applied carefully to maintain state
-
-```
-StatefulSet → Pods (stable identity) → Persistent Volumes
-```
+* **Governing Headless Service:** Always define a governing Headless Service (`clusterIP: None`) matching `spec.serviceName` to ensure each Pod gets a stable DNS record (e.g. `pod-name.service-name.namespace.svc.cluster.local`).
+* **Handle Persistent Volumes Wisely:** When scaling down or deleting a StatefulSet, Kubernetes does not automatically delete the corresponding `PersistentVolumeClaims`. You must clean these up manually if you no longer need the data.
+* **Avoid Plain-Text Passwords:** The provided `mysql-statefulset.yaml` contains hardcoded plain-text credentials for learning purposes. In real-world environments, refactor these to consume values from `Secrets` via `secretKeyRef` (as demonstrated in the [Secret Directory](../Secret/README.md)).
 
 ---
 
-## 🧪 Common Use Cases
+## 🛣️ Learning Path Navigation
 
-* Databases (MySQL, PostgreSQL, MongoDB)
-* Messaging systems (Kafka, RabbitMQ)
-* Stateful microservices
-* Applications requiring stable identity and persistent storage
-
----
-
-## ⚠️ Common Mistakes
-
-* Using StatefulSet for stateless applications
-* Not creating a governing Service
-* Misconfiguring volumeClaimTemplates
-* Not understanding Pod creation and termination order
-
----
-
-## ✅ Best Practices
-
-* Use StatefulSet only for stateful workloads
-* Always define a governing Service
-* Use `volumeClaimTemplates` for persistent storage
-* Monitor Pod readiness and health
-* Choose the correct `updateStrategy` (RollingUpdate for updates, OnDelete for manual control)
-
----
-
-## 🛣️ Learning Path Linkage
-
-### Before StatefulSet
-
-➡️ **Pod → Deployment → Service → Ingress → HPA**
-Understand deployment, scaling, and traffic management
-
-### After StatefulSet
-
-➡️ **PersistentVolume / PVC → Static/Dynamic Provisioning PV**
-Learn about persistent storage management for stateful workloads
-
----
-
-## 📬 Support & Contributions
-
-For questions, issues, or improvements:
-
-* Open a GitHub issue
-* Submit a Pull Request
-
----
-
-Happy Kubernetes Stateful Application Management! 🚀
+    ⏮️ **[DaemonSet](../DaemonSet/README.md)** | ⏭️ **[Service](../Service/README.md)**

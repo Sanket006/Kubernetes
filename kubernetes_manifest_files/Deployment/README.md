@@ -1,8 +1,8 @@
-# Kubernetes Deployment Manifests
+# ☸️ Kubernetes Deployment Manifests
 
-This folder contains **Kubernetes Deployment manifest files**. A **Deployment** manages the lifecycle of Pods and ReplicaSets, providing declarative updates, self-healing, and scaling capabilities.
+This folder contains **Kubernetes Deployment manifest examples**. A **Deployment** manages the lifecycle of Pods and ReplicaSets, providing declarative updates, self-healing, scaling, and rollback capabilities.
 
-Deployments are the **recommended way to manage stateless applications** in Kubernetes because they handle all ReplicaSet creation and management automatically.
+Deployments are the **standard recommended way to run stateless workloads** in production because they automate all ReplicaSet management and rollout processes under the hood.
 
 ---
 
@@ -11,652 +11,118 @@ Deployments are the **recommended way to manage stateless applications** in Kube
 ```
 kubernetes_manifest_files/
 └── Deployment/
-    ├── deployment.yaml 
-    ├── nginx-deployment-service.yaml 
-    └── README.md
+    ├── deployment.yaml                 # Basic Deployment manifest (nginx)
+    ├── nginx-deployment-service.yaml   # Combined Deployment and NodePort Service
+    └── README.md                       # This documentation file
 ```
-
-This folder includes YAML files defining Deployment resources.
-
----
-
-## 📘 What is a Kubernetes Deployment?
-
-A **Deployment** is a controller that:
-
-* Defines the desired state for Pods and ReplicaSets
-* Automatically creates and updates ReplicaSets
-* Supports rolling updates and rollbacks
-* Provides declarative management for stateless applications
-
-In simple terms:
-
-> **Deployment ensures your application runs the desired number of Pods and can be updated safely.**
-
----
-
-## 🎓 What You Learn from Deployments
-
-By working with Deployment manifests, you will understand:
-
-* How Kubernetes manages Pods at scale
-* Rolling updates and rollback mechanisms
-* Declarative updates with minimal downtime
-* Integration with ReplicaSets for automated scaling
-* How Deployments interact with Services and Ingress
 
 ---
 
 ## 🧩 Core Fields Used in Deployment YAML
 
-A typical Deployment manifest includes:
-
 * **apiVersion**: `apps/v1`
 * **kind**: `Deployment`
-* **metadata**:
+* **metadata**: Name, namespace, and labels to identify the Deployment.
+* **spec**: Specifies the Deployment behavior:
+  * **replicas**: Desired number of Pod replicas.
+  * **selector**: Match labels used to identify Pods managed by the Deployment.
+  * **strategy**: Rollout/update configuration:
+    * **type**: `RollingUpdate` (default, zero-downtime) or `Recreate` (drops all old pods first).
+    * **rollingUpdate**: Configures `maxSurge` and `maxUnavailable` boundaries.
+  * **template**: Pod template describing container images, ports, and resource specs.
 
-  * `name`: Deployment name
-  * `labels`: Metadata labels
-* **spec**:
+---
 
-  * `replicas`: Desired number of Pods
-  * `selector.matchLabels`: Labels used to manage Pods
-  * `template`: Pod template
+## 📘 Practical Examples
 
-    * `metadata.labels`: Must match selector
-    * `spec.containers`: Container definitions
+### 1. Production-Ready Deployment Manifest (`deployment.yaml`)
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx-app
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1                            # Max pods created above target during rollout
+      maxUnavailable: 1                      # Max pods down during rollout
+  selector:
+    matchLabels:
+      app: nginx-app
+  template:
+    metadata:
+      labels:
+        app: nginx-app
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx:1.25.3-alpine         # Pinned version (Best Practice)
+          ports:
+            - containerPort: 80
+          resources:                         # Requests/limits (Best Practice)
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+```
 
-      * `image`: Container image
-      * `ports`: Container ports
-      * `resources`: CPU/memory requests & limits
-  * **strategy**: Deployment update strategy
+---
 
-    * `type`: Either `RollingUpdate`, `Recreate`, or `BlueGreen` (custom strategies can be implemented via Operators)
-    * `rollingUpdate` (optional): Parameters for RollingUpdate
+## ▶️ kubectl Operations
 
-      * `maxSurge`: Maximum number of Pods created above desired count during update
-      * `maxUnavailable`: Maximum number of Pods unavailable during update
+### Apply the Manifests
+```bash
+kubectl apply -f kubernetes_manifest_files/Deployment/
+```
+
+### Rollout Management (Updates & Rollbacks)
+```bash
+# Check the status of a running update rollout
+kubectl rollout status deployment/nginx-deployment
+
+# View the deployment rollout history
+kubectl rollout history deployment/nginx-deployment
+
+# Roll back to the previous deployment version
+kubectl rollout undo deployment/nginx-deployment
+```
+
+### Scale Workload
+```bash
+kubectl scale deployment nginx-deployment --replicas=5
+```
+
+### Verify & Describe
+```bash
+kubectl get deployments
+kubectl get replicasets
+kubectl describe deployment nginx-deployment
+```
+
+### Delete Deployment
+```bash
+kubectl delete -f kubernetes_manifest_files/Deployment/
+```
 
 ---
 
 ## 🔑 Deployment Strategies
 
-### 1. RollingUpdate (Default)
-
-* Updates Pods **gradually** with minimal downtime
-* Creates new Pods while terminating old ones
-* Controlled via `maxSurge` and `maxUnavailable`
-
-**Example:**
-
-* `maxSurge: 1`
-* `maxUnavailable: 1`
-
-### 2. Recreate
-
-* Terminates all existing Pods **before** creating new ones
-* Causes downtime but simpler for certain workloads
-
-**Use cases:**
-
-* Stateful applications where only one Pod can run at a time
-* Workloads that cannot handle multiple versions running simultaneously
-
-### 3. Blue/Green Deployment
-
-* Deploys a **new version alongside the old version**
-* Switches traffic to the new version after verification
-* Requires manual or external traffic routing control (via Service or Ingress)
-
-**Use cases:**
-
-* Production systems requiring full version isolation
-* Safe rollback scenarios
-
-### 4. Canary Deployment
-
-* Gradually exposes the new version to a **small subset of users**
-* Monitors metrics before full rollout
-* Typically implemented using Service, Ingress, or custom controllers
-
-**Use cases:**
-
-* Reducing risk of new releases
-* Testing new features in production with limited impact
+1. **RollingUpdate (Default)**:
+   - Replaces old pods with new ones gradually.
+   - Ensures zero downtime by keeping a fraction of pods running at all times.
+2. **Recreate**:
+   - Deletes all active pods before creating the new version.
+   - Causes temporary service downtime but avoids running multiple code versions simultaneously.
 
 ---
 
-## ▶️ kubectl Commands (Apply, Verify & Describe)
+## 🛣️ Learning Path Navigation
 
-Apply Deployment manifests:
-
-```bash
-kubectl apply -f kubernetes_manifest_files/Deployment/
-```
-
-Verify Deployments:
-
-```bash
-kubectl get deployments
-```
-
-Check Pods created by Deployment:
-
-```bash
-kubectl get pods
-```
-
-Describe a Deployment:
-
-```bash
-kubectl describe deployment <deployment-name>
-```
-
-Scale a Deployment:
-
-```bash
-kubectl scale deployment <deployment-name> --replicas=5
-```
-
-Rollout status:
-
-```bash
-kubectl rollout status deployment/<deployment-name>
-```
-
-Rollback to previous version:
-
-```bash
-kubectl rollout undo deployment/<deployment-name>
-```
-
----
-
-## 🔍 Deployment Working Flow
-
-1. Deployment is created with desired replicas and Pod template
-2. Kubernetes creates a ReplicaSet according to the template
-3. ReplicaSet ensures the desired number of Pods are running
-4. Deployment handles rolling updates, scaling, and rollbacks
-
-```
-Deployment → ReplicaSet → Pods
-```
-
----
-
-## 🧪 Common Use Cases
-
-* Managing stateless applications
-* Performing zero-downtime updates
-* Autoscaling Pods with HPA
-* Continuous Deployment in CI/CD pipelines
-
----
-
-## ⚠️ Common Mistakes
-
-* Selector labels not matching Pod template labels
-* Editing Pods directly instead of updating the Deployment
-* Not specifying resource requests and limits
-* Using Recreate strategy when RollingUpdate is required
-
----
-
-## ✅ Best Practices
-
-* Always use **Deployments** for production applications
-* Use **RollingUpdate** strategy for zero-downtime updates
-* Keep labels consistent and unique
-* Define resource requests and limits for each container
-* Integrate with Services for networking
-* Monitor rollout status and set readiness probes
-* Consider Canary or Blue/Green strategies for high-risk production updates
-
----
-
-## 🛣️ Learning Path Linkage
-
-### Before Deployment
-
-➡️ **Pod → ReplicaSet → ReplicationController**
-Understand Pod lifecycle and scaling controllers
-
-### After Deployment
-
-➡️ **Service → Ingress → HPA → PersistentVolume / PVC**
-Learn networking, traffic routing, autoscaling, and storage
-
----
-
-## 📬 Support & Contributions
-
-For questions, issues, or improvements:
-
-* Open a GitHub issue
-* Submit a Pull Request
-
----
-
-Happy Kubernetes Deployment Management! 🚀
-
-
-
-
-
-
-
-
-
-
-# Kubernetes Deployment Manifests
-
-This folder contains **Kubernetes Deployment manifest files**. A **Deployment** manages the lifecycle of Pods and ReplicaSets, providing declarative updates, self-healing, and scaling capabilities.
-
-Deployments are the **recommended way to manage stateless applications** in Kubernetes because they handle all ReplicaSet creation and management automatically.
-
----
-
-## 📁 Folder Structure
-
-```
-kubernetes_manifest_files/
-└── Deployment/
-    ├── *.yaml   # Kubernetes Deployment manifest files
-```
-
-This folder includes YAML files defining Deployment resources.
-
----
-
-## 📘 What is a Kubernetes Deployment?
-
-A **Deployment** is a controller that:
-
-* Defines the desired state for Pods and ReplicaSets
-* Automatically creates and updates ReplicaSets
-* Supports rolling updates and rollbacks
-* Provides declarative management for stateless applications
-
-In simple terms:
-
-> **Deployment ensures your application runs the desired number of Pods and can be updated safely.**
-
----
-
-## 🎓 What You Learn from Deployments
-
-By working with Deployment manifests, you will understand:
-
-* How Kubernetes manages Pods at scale
-* Rolling updates and rollback mechanisms
-* Declarative updates with minimal downtime
-* Integration with ReplicaSets for automated scaling
-* How Deployments interact with Services and Ingress
-
----
-
-## 🧩 Core Fields Used in Deployment YAML
-
-A typical Deployment manifest includes:
-
-* **apiVersion**: `apps/v1`
-* **kind**: `Deployment`
-* **metadata**:
-
-  * `name`: Deployment name
-  * `labels`: Metadata labels
-* **spec**:
-
-  * `replicas`: Desired number of Pods
-  * `selector.matchLabels`: Labels used to manage Pods
-  * `template`: Pod template
-
-    * `metadata.labels`: Must match selector
-    * `spec.containers`: Container definitions
-
-      * `image`: Container image
-      * `ports`: Container ports
-      * `resources`: CPU/memory requests & limits
-  * **strategy**: Deployment update strategy
-
-    * `type`: Either `RollingUpdate` or `Recreate`
-    * `rollingUpdate` (optional): Parameters for RollingUpdate
-
-      * `maxSurge`: Maximum number of Pods created above desired count during update
-      * `maxUnavailable`: Maximum number of Pods unavailable during update
-
----
-
-## 🔑 Deployment Strategies
-
-### 1. RollingUpdate (Default)
-
-* Updates Pods **gradually** with minimal downtime
-* Creates new Pods while terminating old ones
-* Controlled via `maxSurge` and `maxUnavailable`
-
-**Example:**
-
-* `maxSurge: 1`
-* `maxUnavailable: 1`
-
-### 2. Recreate
-
-* Terminates all existing Pods **before** creating new ones
-* Causes downtime but simpler for certain workloads
-
-**Use cases:**
-
-* Stateful applications where only one Pod can run at a time
-* Workloads that cannot handle multiple versions running simultaneously
-
----
-
-## ▶️ kubectl Commands (Apply, Verify & Describe)
-
-Apply Deployment manifests:
-
-```bash
-kubectl apply -f kubernetes_manifest_files/Deployment/
-```
-
-Verify Deployments:
-
-```bash
-kubectl get deployments
-```
-
-Check Pods created by Deployment:
-
-```bash
-kubectl get pods
-```
-
-Describe a Deployment:
-
-```bash
-kubectl describe deployment <deployment-name>
-```
-
-Scale a Deployment:
-
-```bash
-kubectl scale deployment <deployment-name> --replicas=5
-```
-
-Rollout status:
-
-```bash
-kubectl rollout status deployment/<deployment-name>
-```
-
-Rollback to previous version:
-
-```bash
-kubectl rollout undo deployment/<deployment-name>
-```
-
----
-
-## 🔍 Deployment Working Flow
-
-1. Deployment is created with desired replicas and Pod template
-2. Kubernetes creates a ReplicaSet according to the template
-3. ReplicaSet ensures the desired number of Pods are running
-4. Deployment handles rolling updates, scaling, and rollbacks
-
-```
-Deployment → ReplicaSet → Pods
-```
-
----
-
-## 🧪 Common Use Cases
-
-* Managing stateless applications
-* Performing zero-downtime updates
-* Autoscaling Pods with HPA
-* Continuous Deployment in CI/CD pipelines
-
----
-
-## ⚠️ Common Mistakes
-
-* Selector labels not matching Pod template labels
-* Editing Pods directly instead of updating the Deployment
-* Not specifying resource requests and limits
-* Using Recreate strategy when RollingUpdate is required
-
----
-
-## ✅ Best Practices
-
-* Always use **Deployments** for production applications
-* Use **RollingUpdate** strategy for zero-downtime updates
-* Keep labels consistent and unique
-* Define resource requests and limits for each container
-* Integrate with Services for networking
-* Monitor rollout status and set readiness probes
-
----
-
-## 🛣️ Learning Path Linkage
-
-### Before Deployment
-
-➡️ **Pod → ReplicaSet → ReplicationController**
-Understand Pod lifecycle and scaling controllers
-
-### After Deployment
-
-➡️ **Service → Ingress → HPA → PersistentVolume / PVC**
-Learn networking, traffic routing, autoscaling, and storage
-
----
-
-## 📬 Support & Contributions
-
-For questions, issues, or improvements:
-
-* Open a GitHub issue
-* Submit a Pull Request
-
----
-
-Happy Kubernetes Deployment Management! 🚀
-
-
-
-
-
-
-
-
-
-
-# Kubernetes Deployment Manifests
-
-This folder contains **Kubernetes Deployment manifest files**. A **Deployment** manages the lifecycle of Pods and ReplicaSets, providing declarative updates, self-healing, and scaling capabilities.
-
-Deployments are the **recommended way to manage stateless applications** in Kubernetes because they handle all ReplicaSet creation and management automatically.
-
----
-
-## 📁 Folder Structure
-
-```
-kubernetes_manifest_files/
-└── Deployment/
-    ├── *.yaml   # Kubernetes Deployment manifest files
-```
-
-This folder includes YAML files defining Deployment resources.
-
----
-
-## 📘 What is a Kubernetes Deployment?
-
-A **Deployment** is a controller that:
-
-* Defines the desired state for Pods and ReplicaSets
-* Automatically creates and updates ReplicaSets
-* Supports rolling updates and rollbacks
-* Provides declarative management for stateless applications
-
-In simple terms:
-
-> **Deployment ensures your application runs the desired number of Pods and can be updated safely.**
-
----
-
-## 🎓 What You Learn from Deployments
-
-By working with Deployment manifests, you will understand:
-
-* How Kubernetes manages Pods at scale
-* Rolling updates and rollback mechanisms
-* Declarative updates with minimal downtime
-* Integration with ReplicaSets for automated scaling
-* How Deployments interact with Services and Ingress
-
----
-
-## 🧩 Core Fields Used in Deployment YAML
-
-A typical Deployment manifest includes:
-
-* **apiVersion**: `apps/v1`
-* **kind**: `Deployment`
-* **metadata**:
-
-  * `name`: Deployment name
-  * `labels`: Metadata labels
-* **spec**:
-
-  * `replicas`: Desired number of Pods
-  * `selector.matchLabels`: Labels used to manage Pods
-  * `template`: Pod template
-
-    * `metadata.labels`: Must match selector
-    * `spec.containers`: Container definitions
-
-      * `image`: Container image
-      * `ports`: Container ports
-      * `resources`: CPU/memory requests & limits
-  * `strategy`: Update strategy (`RollingUpdate` or `Recreate`)
-
----
-
-## ▶️ kubectl Commands (Apply, Verify & Describe)
-
-Apply Deployment manifests:
-
-```bash
-kubectl apply -f kubernetes_manifest_files/Deployment/
-```
-
-Verify Deployments:
-
-```bash
-kubectl get deployments
-```
-
-Check Pods created by Deployment:
-
-```bash
-kubectl get pods
-```
-
-Describe a Deployment:
-
-```bash
-kubectl describe deployment <deployment-name>
-```
-
-Scale a Deployment:
-
-```bash
-kubectl scale deployment <deployment-name> --replicas=5
-```
-
-Rollout status:
-
-```bash
-kubectl rollout status deployment/<deployment-name>
-```
-
-Rollback to previous version:
-
-```bash
-kubectl rollout undo deployment/<deployment-name>
-```
-
----
-
-## 🔍 Deployment Working Flow
-
-1. Deployment is created with desired replicas and Pod template
-2. Kubernetes creates a ReplicaSet according to the template
-3. ReplicaSet ensures the desired number of Pods are running
-4. Deployment handles rolling updates, scaling, and rollbacks
-
-```
-Deployment → ReplicaSet → Pods
-```
-
----
-
-## 🧪 Common Use Cases
-
-* Managing stateless applications
-* Performing zero-downtime updates
-* Autoscaling Pods with HPA
-* Continuous Deployment in CI/CD pipelines
-
----
-
-## ⚠️ Common Mistakes
-
-* Selector labels not matching Pod template labels
-* Editing Pods directly instead of updating the Deployment
-* Not specifying resource requests and limits
-* Using Recreate strategy when RollingUpdate is required
-
----
-
-## ✅ Best Practices
-
-* Always use **Deployments** for production applications
-* Use **RollingUpdate** strategy for zero-downtime updates
-* Keep labels consistent and unique
-* Define resource requests and limits for each container
-* Integrate with Services for networking
-* Monitor rollout status and set readiness probes
-
----
-
-## 🛣️ Learning Path Linkage
-
-### Before Deployment
-
-➡️ **Pod → ReplicaSet → ReplicationController**
-Understand Pod lifecycle and scaling controllers
-
-### After Deployment
-
-➡️ **Service → Ingress → HPA → PersistentVolume / PVC**
-Learn networking, traffic routing, autoscaling, and storage
-
----
-
-## 📬 Support & Contributions
-
-For questions, issues, or improvements:
-
-* Open a GitHub issue
-* Submit a Pull Request
-
----
-
-Happy Kubernetes Dep
+⏮️ **[ReplicaSet](../ReplicaSet/README.md)** | ⏭️ **[DaemonSet](../DaemonSet/README.md)**
